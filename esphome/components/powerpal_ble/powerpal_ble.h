@@ -5,10 +5,7 @@
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/core/defines.h"
-#ifdef USE_HTTP_REQUEST
-#include "esphome/components/http_request/http_request.h"
-#include <ArduinoJson.h>
-#endif
+#include "esphome/core/helpers.h"
 
 #ifdef USE_TIME
 #include "esphome/components/time/real_time_clock.h"
@@ -64,7 +61,7 @@ static const espbt::ESPBTUUID POWERPAL_BATTERY_CHARACTERISTIC_UUID = espbt::ESPB
 static const uint8_t seconds_in_minute = 60;    // seconds
 static const float kw_to_w_conversion = 1000.0;    // conversion ratio
 
-// static const std::string POWERPAL_API_URL = "https://readings.powerpal.net/api/v1/meter_reading/";
+
 
 class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   // class Powerpal : public esphome::ble_client::BLEClientNode, public PollingComponent {
@@ -81,9 +78,11 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   void set_power_sensor(sensor::Sensor *power_sensor) { power_sensor_ = power_sensor; }
   void set_energy_sensor(sensor::Sensor *energy_sensor) { energy_sensor_ = energy_sensor; }
   void set_daily_energy_sensor(sensor::Sensor *daily_energy_sensor) { daily_energy_sensor_ = daily_energy_sensor; }
-#ifdef USE_HTTP_REQUEST
-  void set_http_request(http_request::HttpRequestComponent *cloud_uploader) { cloud_uploader_ = cloud_uploader; }
-#endif
+  void set_cost_sensor(sensor::Sensor *cost_sensor) { cost_sensor_ = cost_sensor;}
+  void set_pulses_sensor(sensor::Sensor *pulses_sensor) { pulses_sensor_ = pulses_sensor;}
+  void set_watt_hours(sensor::Sensor *watt_hours_sensor) {watt_hours_sensor_ = watt_hours_sensor;}
+  void set_timestamp(sensor::Sensor *timestamp_sensor) { timestamp_sensor_ = timestamp_sensor;}
+  void set_daily_pulses_sensor(sensor::Sensor *daily_pulses_sensor) { daily_pulses_sensor_ = daily_pulses_sensor;}
 #ifdef USE_TIME
   void set_time(time::RealTimeClock *time) { time_ = time; }
 #endif
@@ -97,19 +96,18 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   void set_notification_interval(uint8_t reading_batch_size) { reading_batch_size_[0] = reading_batch_size; }
   void set_device_id(std::string powerpal_device_id) { powerpal_device_id_ = powerpal_device_id; }
   void set_apikey(std::string powerpal_apikey) { powerpal_apikey_ = powerpal_apikey; }
-  void set_energy_cost(float energy_cost) { energy_cost_ = energy_cost; }
+  void set_energy_cost(double energy_cost) { energy_cost_ = energy_cost; }
 
+  uint64_t daily_pulses_{0};
  protected:
   std::string pkt_to_hex_(const uint8_t *data, uint16_t len);
   void decode_(const uint8_t *data, uint16_t length);
   void parse_battery_(const uint8_t *data, uint16_t length);
   void parse_measurement_(const uint8_t *data, uint16_t length);
+ 
   std::string uuid_to_device_id_(const uint8_t *data, uint16_t length);
   std::string serial_to_apikey_(const uint8_t *data, uint16_t length);
-#ifdef USE_HTTP_REQUEST
-  void store_measurement_(uint16_t measurement, time_t timestamp, uint32_t watt_hours, float cost);
-  void upload_data_to_cloud_();
-#endif
+
 
   bool authenticated_;
 
@@ -117,9 +115,13 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   sensor::Sensor *power_sensor_{nullptr};
   sensor::Sensor *energy_sensor_{nullptr};
   sensor::Sensor *daily_energy_sensor_{nullptr};
-#ifdef USE_HTTP_REQUEST
-  http_request::HttpRequestComponent *cloud_uploader_{nullptr};
-#endif
+  sensor::Sensor *cost_sensor_{nullptr};
+  sensor::Sensor *pulses_sensor_{nullptr};
+  sensor::Sensor *daily_pulses_sensor_{nullptr};
+  sensor::Sensor *watt_hours_sensor_{nullptr};
+  sensor::Sensor *timestamp_sensor_{nullptr};
+ 
+
 #ifdef USE_TIME
   optional<time::RealTimeClock *> time_{};
 #endif
@@ -129,16 +131,13 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   uint8_t reading_batch_size_[4] = {0x01, 0x00, 0x00, 0x00};
   float pulses_per_kwh_;
   float pulse_multiplier_;
-  uint64_t daily_pulses_{0};
   uint64_t total_pulses_{0};
 
   uint8_t stored_measurements_count_{0};
   std::vector<PowerpalMeasurement> stored_measurements_;
-  // std::string powerpal_api_root_ = "http://192.168.1.167:1880/powerpal/";
-  std::string powerpal_api_root_ = "https://readings.powerpal.net/api/v1/meter_reading/";
-  std::string powerpal_device_id_; // = "00002bc3";
-  std::string powerpal_apikey_; // = "4a89e298-b17b-43e7-a0c1-fcd1412e98ef";
-  float energy_cost_;
+  std::string powerpal_device_id_; 
+  std::string powerpal_apikey_; 
+  double energy_cost_;
 
   uint16_t pairing_code_char_handle_ = 0x2e;
   uint16_t reading_batch_size_char_handle_ = 0x33;
@@ -151,7 +150,7 @@ class Powerpal : public esphome::ble_client::BLEClientNode, public Component {
   uint16_t serial_number_char_handle_ = 0x2b;
 };
 
-}  // namespace powerpal_ble
-}  // namespace esphome
+}  
+}  
 
 #endif

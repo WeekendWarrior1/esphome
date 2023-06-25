@@ -92,12 +92,12 @@ void BLEClient::connect() {
   }
 }
 
-void BLEClient::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t esp_gattc_if,
+bool BLEClient::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t esp_gattc_if,
                                     esp_ble_gattc_cb_param_t *param) {
   if (event == ESP_GATTC_REG_EVT && this->app_id != param->reg.app_id)
-    return;
+    return false;
   if (event != ESP_GATTC_REG_EVT && esp_gattc_if != ESP_GATT_IF_NONE && esp_gattc_if != this->gattc_if)
-    return;
+    return false;
 
   bool all_established = this->all_nodes_established_();
 
@@ -142,7 +142,7 @@ void BLEClient::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t es
     }
     case ESP_GATTC_DISCONNECT_EVT: {
       if (memcmp(param->disconnect.remote_bda, this->remote_bda, 6) != 0) {
-        return;
+        return false;
       }
       ESP_LOGV(TAG, "[%s] ESP_GATTC_DISCONNECT_EVT, reason %d", this->address_str().c_str(), param->disconnect.reason);
       for (auto &svc : this->services_)
@@ -204,6 +204,7 @@ void BLEClient::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t es
       delete svc;  // NOLINT(cppcoreguidelines-owning-memory)
     this->services_.clear();
   }
+  return true;
 }
 
 void BLEClient::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {

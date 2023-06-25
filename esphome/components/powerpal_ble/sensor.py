@@ -1,7 +1,7 @@
 import logging
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, ble_client, time, http_request
+from esphome.components import sensor, ble_client, time
 from esphome.const import (
     CONF_ID,
     CONF_BATTERY_LEVEL,
@@ -17,6 +17,7 @@ from esphome.const import (
     UNIT_WATT,
     UNIT_PERCENT,
     CONF_TIME_ID,
+    CONF_TEXT_SENSORS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,22 +31,21 @@ Powerpal = powerpal_ble_ns.class_("Powerpal", ble_client.BLEClientNode, cg.Compo
 CONF_PAIRING_CODE = "pairing_code"
 CONF_NOTIFICATION_INTERVAL = "notification_interval"
 CONF_PULSES_PER_KWH = "pulses_per_kwh"
-CONF_HTTP_REQUEST_ID = "http_request_id"
 CONF_COST_PER_KWH = "cost_per_kwh"
 CONF_POWERPAL_DEVICE_ID = "powerpal_device_id"
 CONF_POWERPAL_APIKEY = "powerpal_apikey"
 CONF_DAILY_ENERGY = "daily_energy"
-
+CONF_WATT_HOURS = "watt_hours"
+CONF_TIME_STAMP = "timestamp"
+CONF_PULSES = "pulses"
+CONF_COST = "cost"
+CONF_DAILY_PULSES = "daily_pulses"
 
 def _validate(config):
     if CONF_DAILY_ENERGY in config and CONF_TIME_ID not in config:
         _LOGGER.warning(
             "Using daily_energy without a time_id means relying on your Powerpal's RTC for packet times, which is not recommended. "
             "Please consider adding a time component to your ESPHome yaml, and it's time_id to your powerpal_ble component."
-        )
-    if CONF_HTTP_REQUEST_ID in config and CONF_COST_PER_KWH not in config:
-        raise cv.Invalid(
-            f"If using the Powerpal cloud uploader, you must also set '{CONF_COST_PER_KWH}'"
         )
     return config
 
@@ -102,12 +102,20 @@ CONFIG_SCHEMA = cv.All(
                 accuracy_decimals=3,
                 device_class=DEVICE_CLASS_ENERGY,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
+
             ),
             cv.Optional(CONF_ENERGY): sensor.sensor_schema(
                 unit_of_measurement=UNIT_KILOWATT_HOURS,
                 accuracy_decimals=3,
                 device_class=DEVICE_CLASS_ENERGY,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
+            ),
+            cv.Optional(CONF_WATT_HOURS): sensor.sensor_schema(),
+            cv.Optional(CONF_PULSES): sensor.sensor_schema(),
+            cv.Optional(CONF_DAILY_PULSES): sensor.sensor_schema(),
+            cv.Optional(CONF_TIME_STAMP): sensor.sensor_schema(),
+            cv.Optional(CONF_COST): sensor.sensor_schema(
+                accuracy_decimals=11
             ),
             cv.Required(CONF_PAIRING_CODE): cv.int_range(min=1, max=999999),
             cv.Required(CONF_NOTIFICATION_INTERVAL): cv.int_range(min=1, max=60),
@@ -117,9 +125,6 @@ CONFIG_SCHEMA = cv.All(
                 device_class=DEVICE_CLASS_BATTERY,
                 accuracy_decimals=0,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-            ),
-            cv.Optional(CONF_HTTP_REQUEST_ID): cv.use_id(
-                http_request.HttpRequestComponent
             ),
             cv.Optional(CONF_COST_PER_KWH): cv.float_range(min=0),
             cv.Optional(
@@ -155,6 +160,25 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_DAILY_ENERGY])
         cg.add(var.set_daily_energy_sensor(sens))
 
+    if CONF_PULSES in config:
+        sens = await sensor.new_sensor(config[CONF_PULSES])
+        cg.add(var.set_pulses_sensor(sens))
+
+    if CONF_DAILY_PULSES in config:
+        sens = await sensor.new_sensor(config[CONF_DAILY_PULSES])
+        cg.add(var.set_daily_pulses_sensor(sens))
+    if CONF_WATT_HOURS in config:
+        sens = await sensor.new_sensor(config[CONF_WATT_HOURS])
+        cg.add(var.set_watt_hours(sens))
+
+    if CONF_TIME_STAMP in config:
+        sens = await sensor.new_sensor(config[CONF_TIME_STAMP])
+        cg.add(var.set_timestamp(sens))
+
+    if CONF_COST in config:
+        sens = await sensor.new_sensor(config[CONF_COST])
+        cg.add(var.set_cost_sensor(sens))
+
     if CONF_PAIRING_CODE in config:
         cg.add(var.set_pairing_code(config[CONF_PAIRING_CODE]))
 
@@ -168,10 +192,6 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_BATTERY_LEVEL])
         cg.add(var.set_battery(sens))
 
-    if CONF_HTTP_REQUEST_ID in config:
-        cg.add_define("USE_HTTP_REQUEST")
-        http_request_component = await cg.get_variable(config[CONF_HTTP_REQUEST_ID])
-        cg.add(var.set_http_request(http_request_component))
 
     if CONF_COST_PER_KWH in config:
         cg.add(var.set_energy_cost(config[CONF_COST_PER_KWH]))
