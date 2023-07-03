@@ -106,7 +106,7 @@ void Powerpal::parse_measurement_(const uint8_t *data, uint16_t length) {
       // else, use the powerpal measurement timestamps
 #ifdef USE_TIME
       auto *time_ = *this->time_;
-      time::ESPTime date_of_measurement = time_->now();
+      ESPTime date_of_measurement = time_->now();
       if (date_of_measurement.is_valid()) {
         if (this->day_of_last_measurement_ == 0) { this->day_of_last_measurement_ = date_of_measurement.day_of_year;}
         else if (this->day_of_last_measurement_ != date_of_measurement.day_of_year) {
